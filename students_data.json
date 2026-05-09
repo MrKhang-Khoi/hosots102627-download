@@ -1,0 +1,91 @@
+{
+  "exported_at": "09/05/2026 10:30",
+  "school": "Trường THCS Chu Văn An",
+  "year": "2025-2026",
+  "classes": ["9A1", "9A2", "9B1"],
+  "doc_labels": {
+    "GIAYKHAISINH": "Giấy khai sinh",
+    "CNTN_THCS": "CN tốt nghiệp THCS",
+    "HOCBA_6_9": "Học bạ (lớp 6-9)",
+    "CCCD": "CCCD / Mã định danh",
+    "ANH_THE": "Ảnh thẻ 4x6",
+    "UU_TIEN": "Ưu tiên (nếu có)"
+  },
+  "doc_order": ["GIAYKHAISINH", "CNTN_THCS", "HOCBA_6_9", "CCCD", "ANH_THE", "UU_TIEN"],
+  "overall_labels": {
+    "CHUA_NOP": "Chưa nộp",
+    "TAM_DU_GIAI_DOAN_1": "Tạm đủ giai đoạn 1",
+    "CHUA_DU": "Chưa đủ hồ sơ",
+    "CAN_SUA": "Cần nộp lại",
+    "DU_HO_SO_CHINH_THUC": "Đủ hồ sơ chính thức"
+  },
+  "students": {
+    "9A1": [
+      {
+        "stt": "1",
+        "ho_ten": "Nguyễn Thị Hồng Anh",
+        "ngay_sinh": "15/03/2011",
+        "status": "TAM_DU_GIAI_DOAN_1",
+        "doc_count": 5,
+        "docs": {
+          "GIAYKHAISINH": {"file_id": "1BxKm_SAMPLE_ID_1", "name": "GIAYKHAISINH.pdf", "status": "DAT"},
+          "CNTN_THCS": {"file_id": "1BxKm_SAMPLE_ID_2", "name": "CNHT_Lop_9.pdf", "status": "DAT"},
+          "HOCBA_6_9": {"file_id": "1BxKm_SAMPLE_ID_3", "name": "HOCBA_6_9.pdf", "status": "DAT"},
+          "CCCD": {"file_id": "1BxKm_SAMPLE_ID_4", "name": "CCCD.pdf", "status": "DAT"},
+          "ANH_THE": {"file_id": "1BxKm_SAMPLE_ID_5", "name": "ANH_THE.pdf", "status": "DAT"}
+        }
+      },
+      {
+        "stt": "2",
+        "ho_ten": "Huỳnh Mai Kiều My",
+        "ngay_sinh": "29/01/2011",
+        "status": "TAM_DU_GIAI_DOAN_1",
+        "doc_count": 4,
+        "docs": {
+          "GIAYKHAISINH": {"file_id": "1CxKm_SAMPLE_ID_1", "name": "GIAYKHAISINH.pdf", "status": "DAT"},
+          "CNTN_THCS": {"file_id": "1CxKm_SAMPLE_ID_2", "name": "CNHT_Lop_9.pdf", "status": "DAT"},
+          "CCCD": {"file_id": "1CxKm_SAMPLE_ID_3", "name": "CCCD.pdf", "status": "DAT"},
+          "ANH_THE": {"file_id": "1CxKm_SAMPLE_ID_4", "name": "ANH_THE.pdf", "status": "DAT"}
+        }
+      },
+      {
+        "stt": "3",
+        "ho_ten": "Trần Văn Minh",
+        "ngay_sinh": "05/07/2011",
+        "status": "CHUA_DU",
+        "doc_count": 2,
+        "docs": {
+          "GIAYKHAISINH": {"file_id": "1DxKm_SAMPLE_ID_1", "name": "GIAYKHAISINH.pdf", "status": "DAT"},
+          "CCCD": {"file_id": "1DxKm_SAMPLE_ID_2", "name": "CCCD.pdf", "status": "DA_NOP_CHO_KIEM_TRA"}
+        }
+      }
+    ],
+    "9A2": [
+      {
+        "stt": "1",
+        "ho_ten": "Lê Thị Bích Ngọc",
+        "ngay_sinh": "12/11/2011",
+        "status": "DU_HO_SO_CHINH_THUC",
+        "doc_count": 6,
+        "docs": {
+          "GIAYKHAISINH": {"file_id": "2AxKm_SAMPLE_ID_1", "name": "GIAYKHAISINH.pdf", "status": "DAT"},
+          "CNTN_THCS": {"file_id": "2AxKm_SAMPLE_ID_2", "name": "CNHT_Lop_9.pdf", "status": "DAT"},
+          "HOCBA_6_9": {"file_id": "2AxKm_SAMPLE_ID_3", "name": "HOCBA_6_9.pdf", "status": "DAT"},
+          "CCCD": {"file_id": "2AxKm_SAMPLE_ID_4", "name": "CCCD.pdf", "status": "DAT"},
+          "ANH_THE": {"file_id": "2AxKm_SAMPLE_ID_5", "name": "ANH_THE.pdf", "status": "DAT"},
+          "UU_TIEN": {"file_id": "2AxKm_SAMPLE_ID_6", "name": "UU_TIEN.pdf", "status": "DAT"}
+        }
+      }
+    ],
+    "9B1": [
+      {
+        "stt": "1",
+        "ho_ten": "Phạm Đức Huy",
+        "ngay_sinh": "22/09/2011",
+        "status": "CHUA_NOP",
+        "doc_count": 0,
+        "docs": {}
+      }
+    ]
+  }
+}
