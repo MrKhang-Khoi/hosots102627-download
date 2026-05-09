@@ -331,14 +331,41 @@ function selectStudent(s) {
 // ===== TẢI TẤT CẢ =====
 function downloadAll() {
   if (!currentStudent || !currentStudent.docs) return;
-  var docs = currentStudent.docs, keys = Object.keys(docs), i = 0;
-  (function next() {
-    if (i >= keys.length) return;
+  var docs = currentStudent.docs;
+  var keys = Object.keys(docs).filter(function(k) { return docs[k] && docs[k].file_id; });
+  if (!keys.length) return;
+
+  var btn = document.getElementById('download-all-btn');
+  var originalText = btn.innerHTML;
+  var i = 0;
+
+  function next() {
+    if (i >= keys.length) {
+      btn.innerHTML = '✅ Đã tải ' + keys.length + ' file!';
+      btn.style.background = 'linear-gradient(135deg, #2e7d32, #43a047)';
+      setTimeout(function() {
+        btn.innerHTML = originalText;
+        btn.style.background = '';
+      }, 3000);
+      return;
+    }
     var d = docs[keys[i]];
-    if (d && d.file_id) window.open('https://drive.google.com/uc?id='+d.file_id+'&export=download','_blank');
+    btn.innerHTML = '⏳ Đang tải ' + (i+1) + '/' + keys.length + '...';
+
+    // Dùng hidden anchor để tránh popup blocker
+    var a = document.createElement('a');
+    a.href = 'https://drive.google.com/uc?id=' + d.file_id + '&export=download';
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
     i++;
-    if (i < keys.length) setTimeout(next, 600);
-  })();
+    setTimeout(next, 1500); // Delay 1.5s giữa mỗi file để tránh bị chặn
+  }
+  next();
 }
 
 // ===== HELPERS =====
