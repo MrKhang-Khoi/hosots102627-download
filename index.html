@@ -68,6 +68,8 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:var(--bg);color:var(--te
 .doc-btn{padding:7px 14px;border-radius:8px;font-size:.75rem;font-weight:600;font-family:inherit;cursor:pointer;border:none;transition:all .15s;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
 .btn-view{background:#e3f2fd;color:var(--primary)}.btn-view:hover{background:#bbdefb}
 .btn-download{background:var(--primary);color:#fff}.btn-download:hover{background:var(--primary-dark)}
+.btn-photo{background:linear-gradient(135deg,#e65100,#ff9800);color:#fff}.btn-photo:hover{background:linear-gradient(135deg,#bf360c,#e65100)}
+.btn-photo:disabled{opacity:.6;cursor:wait}
 .doc-none{font-size:.75rem;color:#bbb;font-style:italic}
 .footer{text-align:center;padding:16px;font-size:.72rem;color:var(--text-sub);border-top:1px solid #e3e8ef;background:#fff}
 .footer strong{color:var(--primary-dark)}
@@ -158,7 +160,7 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:var(--bg);color:var(--te
   <div style="margin-top:4px">Cập nhật: <span id="export-date">—</span></div>
 </footer>
 
-<script>
+<script type="module">
 // ╔════════════════════════════════════════════════════════════╗
 // ║  CẤU HÌNH: Thay URL này bằng URL Apps Script của bạn     ║
 // ╚════════════════════════════════════════════════════════════╝
@@ -321,6 +323,7 @@ function selectStudent(s) {
       (has ? '<div class="doc-actions">' +
         '<a class="doc-btn btn-view" href="https://drive.google.com/file/d/'+doc.file_id+'/view" target="_blank">👁️ Xem</a>' +
         '<a class="doc-btn btn-download" href="https://drive.google.com/uc?id='+doc.file_id+'&export=download" target="_blank">📥 Tải</a>' +
+        (dt === 'ANH_THE' ? '<button class="doc-btn btn-photo" onclick="downloadPhoto34(this,\''+doc.file_id+'\')" title="Chuyển PDF thành ảnh 3x4">📸 Ảnh 3×4</button>' : '') +
       '</div>' : '');
     docList.appendChild(card);
   });
@@ -379,6 +382,126 @@ function normalize(s) {
   return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\u0111\u0110]/g,'d').replace(/\s+/g,' ').trim();
 }
 function esc(s) { var d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+
+// ===== TẢI ẢNH 3x4 TỪ PDF =====
+// Chuẩn Việt Nam: 3cm x 4cm, 300DPI = 354x472px
+function downloadPhoto34(btn, fileId) {
+  if (!currentStudent) return;
+  var origText = btn.innerHTML;
+  btn.innerHTML = '⏳ Đang xử lý...';
+  btn.disabled = true;
+
+  fetchAPI('file', { id: fileId }, function(data) {
+    btn.innerHTML = '⏳ Đang chuyển ảnh...';
+    // Load PDF.js module dynamically
+    loadPdfJs(function(pdfjsLib) {
+      convertPdfToPhoto34(pdfjsLib, data.content, function(jpgBlob) {
+        var prefix = (currentStudent.ho_ten || 'HS').replace(/\s+/g, '');
+        var fileName = 'AnhThe3x4_' + prefix + '_' + currentClass + '.jpg';
+        triggerDownload(jpgBlob, fileName);
+        btn.innerHTML = '✅ Đã tải!';
+        btn.disabled = false;
+        setTimeout(function() { btn.innerHTML = origText; }, 3000);
+      }, function(err) {
+        btn.innerHTML = '❌ ' + err;
+        btn.disabled = false;
+        setTimeout(function() { btn.innerHTML = origText; }, 3000);
+      });
+    });
+  }, function(err) {
+    btn.innerHTML = '❌ Lỗi: ' + err;
+    btn.disabled = false;
+    setTimeout(function() { btn.innerHTML = origText; }, 3000);
+  });
+}
+
+// Load PDF.js (lazy, chỉ khi cần)
+var _pdfjsLoaded = null;
+function loadPdfJs(cb) {
+  if (_pdfjsLoaded) { cb(_pdfjsLoaded); return; }
+  import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs').then(function(mod) {
+    mod.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
+    _pdfjsLoaded = mod;
+    cb(mod);
+  });
+}
+
+// Chuyển PDF base64 → ảnh JPG 3x4 chuẩn VN
+function convertPdfToPhoto34(pdfjsLib, b64Content, onOK, onErr) {
+  try {
+    // Decode base64 → Uint8Array
+    var raw = atob(b64Content);
+    var pdfBytes = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) pdfBytes[i] = raw.charCodeAt(i);
+
+    pdfjsLib.getDocument({ data: pdfBytes }).promise.then(function(pdf) {
+      pdf.getPage(1).then(function(page) {
+        // Render ở scale cao để giữ nét (scale=4 → ~300DPI cho A4)
+        var scale = 4;
+        var viewport = page.getViewport({ scale: scale });
+
+        var canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        var ctx = canvas.getContext('2d');
+
+        page.render({ canvasContext: ctx, viewport: viewport }).promise.then(function() {
+          // Crop center theo tỉ lệ 3:4
+          var TARGET_RATIO = 3 / 4; // 0.75
+          var srcW = canvas.width, srcH = canvas.height;
+          var srcRatio = srcW / srcH;
+          var cropX, cropY, cropW, cropH;
+
+          if (srcRatio > TARGET_RATIO) {
+            // Rộng hơn → cắt 2 bên
+            cropH = srcH;
+            cropW = Math.round(srcH * TARGET_RATIO);
+            cropX = Math.round((srcW - cropW) / 2);
+            cropY = 0;
+          } else {
+            // Cao hơn → cắt trên dưới
+            cropW = srcW;
+            cropH = Math.round(srcW / TARGET_RATIO);
+            cropX = 0;
+            cropY = Math.round((srcH - cropH) / 2);
+          }
+
+          // Output: 3x4cm @ 300DPI = 354x472px
+          var OUT_W = 354, OUT_H = 472;
+          var outCanvas = document.createElement('canvas');
+          outCanvas.width = OUT_W;
+          outCanvas.height = OUT_H;
+          var outCtx = outCanvas.getContext('2d');
+          outCtx.imageSmoothingEnabled = true;
+          outCtx.imageSmoothingQuality = 'high';
+          outCtx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, OUT_W, OUT_H);
+
+          outCanvas.toBlob(function(blob) {
+            if (blob) onOK(blob);
+            else onErr('Không tạo được ảnh');
+          }, 'image/jpeg', 0.95);
+        });
+      });
+    }).catch(function(e) { onErr('Lỗi đọc PDF: ' + e.message); });
+  } catch (e) { onErr('Lỗi: ' + e.message); }
+}
+
+function triggerDownload(blob, name) {
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Expose functions dùng trong onclick (module scope không global)
+window.showStep = showStep;
+window.selectClass = selectClass;
+window.selectStudent = selectStudent;
+window.filterStudents = filterStudents;
+window.downloadAll = downloadAll;
+window.downloadPhoto34 = downloadPhoto34;
 </script>
 </body>
 </html>
