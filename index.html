@@ -337,35 +337,31 @@ function downloadAll() {
 
   var btn = document.getElementById('download-all-btn');
   var originalText = btn.innerHTML;
-  var i = 0;
+  var total = keys.length;
 
-  function next() {
-    if (i >= keys.length) {
-      btn.innerHTML = '✅ Đã tải ' + keys.length + ' file!';
-      btn.style.background = 'linear-gradient(135deg, #2e7d32, #43a047)';
-      setTimeout(function() {
-        btn.innerHTML = originalText;
-        btn.style.background = '';
-      }, 3000);
-      return;
-    }
-    var d = docs[keys[i]];
-    btn.innerHTML = '⏳ Đang tải ' + (i+1) + '/' + keys.length + '...';
+  // Tải từng file bằng iframe ẩn (không bị popup blocker)
+  keys.forEach(function(k, i) {
+    setTimeout(function() {
+      btn.innerHTML = '⏳ Đang tải ' + (i + 1) + '/' + total + '...';
 
-    // Dùng hidden anchor để tránh popup blocker
-    var a = document.createElement('a');
-    a.href = 'https://drive.google.com/uc?id=' + d.file_id + '&export=download';
-    a.target = '_blank';
-    a.rel = 'noopener';
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+      var iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = 'https://drive.google.com/uc?id=' + docs[k].file_id + '&export=download';
+      document.body.appendChild(iframe);
 
-    i++;
-    setTimeout(next, 1500); // Delay 1.5s giữa mỗi file để tránh bị chặn
-  }
-  next();
+      // Xóa iframe sau 60s
+      setTimeout(function() { if (iframe.parentNode) iframe.parentNode.removeChild(iframe); }, 60000);
+
+      // File cuối → hiện hoàn thành
+      if (i === total - 1) {
+        setTimeout(function() {
+          btn.innerHTML = '✅ Đã tải ' + total + ' file!';
+          btn.style.background = 'linear-gradient(135deg, #2e7d32, #43a047)';
+          setTimeout(function() { btn.innerHTML = originalText; btn.style.background = ''; }, 3000);
+        }, 1500);
+      }
+    }, i * 2000); // 2s giữa mỗi file
+  });
 }
 
 // ===== HELPERS =====
