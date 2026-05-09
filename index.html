@@ -69,7 +69,16 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:var(--bg);color:var(--te
 .btn-view{background:#e3f2fd;color:var(--primary)}.btn-view:hover{background:#bbdefb}
 .btn-download{background:var(--primary);color:#fff}.btn-download:hover{background:var(--primary-dark)}
 .btn-photo{background:linear-gradient(135deg,#e65100,#ff9800);color:#fff}.btn-photo:hover{background:linear-gradient(135deg,#bf360c,#e65100)}
-.btn-photo:disabled{opacity:.6;cursor:wait}
+.btn-photo:disabled,.btn-delete:disabled{opacity:.6;cursor:wait}
+.btn-delete{background:#ffebee;color:#c62828}.btn-delete:hover{background:#ffcdd2}
+.confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:999;animation:fadeIn .2s}
+.confirm-box{background:#fff;border-radius:16px;padding:28px 24px;max-width:360px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.confirm-title{font-size:1rem;font-weight:700;margin-bottom:8px;color:#c62828}
+.confirm-msg{font-size:.82rem;color:var(--text-sub);margin-bottom:20px;line-height:1.5}
+.confirm-btns{display:flex;gap:10px;justify-content:center}
+.confirm-btns button{padding:10px 24px;border-radius:10px;font-size:.85rem;font-weight:600;font-family:inherit;cursor:pointer;border:none}
+.confirm-cancel{background:#e3e8ef;color:var(--text)}.confirm-cancel:hover{background:#cbd5e1}
+.confirm-ok{background:#c62828;color:#fff}.confirm-ok:hover{background:#b71c1c}
 .doc-none{font-size:.75rem;color:#bbb;font-style:italic}
 .footer{text-align:center;padding:16px;font-size:.72rem;color:var(--text-sub);border-top:1px solid #e3e8ef;background:#fff}
 .footer strong{color:var(--primary-dark)}
@@ -323,7 +332,8 @@ function selectStudent(s) {
       (has ? '<div class="doc-actions">' +
         '<a class="doc-btn btn-view" href="https://drive.google.com/file/d/'+doc.file_id+'/view" target="_blank">👁️ Xem</a>' +
         '<a class="doc-btn btn-download" href="https://drive.google.com/uc?id='+doc.file_id+'&export=download" target="_blank">📥 Tải</a>' +
-        (dt === 'ANH_THE' ? '<button class="doc-btn btn-photo" onclick="downloadPhoto34(this,\''+doc.file_id+'\')" title="Chuyển PDF thành ảnh 3x4">📸 Ảnh 3×4</button>' : '') +
+        (dt === 'ANH_THE' ? '<button class="doc-btn btn-photo" onclick="downloadPhoto34(this,\''+doc.file_id+'\')">📸 Ảnh 3×4</button>' : '') +
+        '<button class="doc-btn btn-delete" onclick="deleteFile(this,\''+doc.file_id+'\',\''+dt+'\')">🗑️ Xóa</button>' +
       '</div>' : '');
     docList.appendChild(card);
   });
@@ -383,107 +393,168 @@ function normalize(s) {
 }
 function esc(s) { var d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
 
-// ===== TẢI ẢNH 3x4 TỪ PDF =====
+// ===== TẢI ẢNH 3x4 TỪ PDF HOẶC ẢNH =====
 // Chuẩn Việt Nam: 3cm x 4cm, 300DPI = 354x472px
 function downloadPhoto34(btn, fileId) {
   if (!currentStudent) return;
   var origText = btn.innerHTML;
-  btn.innerHTML = '⏳ Đang xử lý...';
+  btn.innerHTML = '⏳ Đang tải file...';
   btn.disabled = true;
 
   fetchAPI('file', { id: fileId }, function(data) {
     btn.innerHTML = '⏳ Đang chuyển ảnh...';
-    // Load PDF.js module dynamically
-    loadPdfJs(function(pdfjsLib) {
-      convertPdfToPhoto34(pdfjsLib, data.content, function(jpgBlob) {
-        var prefix = (currentStudent.ho_ten || 'HS').replace(/\s+/g, '');
-        var fileName = 'AnhThe3x4_' + prefix + '_' + currentClass + '.jpg';
-        triggerDownload(jpgBlob, fileName);
-        btn.innerHTML = '✅ Đã tải!';
-        btn.disabled = false;
-        setTimeout(function() { btn.innerHTML = origText; }, 3000);
-      }, function(err) {
-        btn.innerHTML = '❌ ' + err;
-        btn.disabled = false;
-        setTimeout(function() { btn.innerHTML = origText; }, 3000);
+    var prefix = (currentStudent.ho_ten || 'HS').replace(/\s+/g, '');
+    var fileName = 'AnhThe3x4_' + prefix + '_' + currentClass + '.jpg';
+
+    // Kiểm tra MIME: ảnh hay PDF?
+    var mime = (data.mime || '').toLowerCase();
+    if (mime.indexOf('image') >= 0) {
+      // File thực chất là ẢNH (jpg/png) → xử lý trực tiếp, không cần PDF.js
+      cropImageTo34(data.content, data.mime, function(blob) {
+        triggerDownload(blob, fileName);
+        doneBtn(btn, origText);
+      }, function(err) { errBtn(btn, origText, err); });
+    } else {
+      // File là PDF → dùng PDF.js
+      loadPdfJs(function(pdfjsLib) {
+        convertPdfToPhoto34(pdfjsLib, data.content, function(blob) {
+          triggerDownload(blob, fileName);
+          doneBtn(btn, origText);
+        }, function(err) { errBtn(btn, origText, err); });
       });
-    });
-  }, function(err) {
-    btn.innerHTML = '❌ Lỗi: ' + err;
-    btn.disabled = false;
-    setTimeout(function() { btn.innerHTML = origText; }, 3000);
-  });
+    }
+  }, function(err) { errBtn(btn, origText, err); });
 }
 
-// Load PDF.js (lazy, chỉ khi cần)
+function doneBtn(btn, origText) {
+  btn.innerHTML = '✅ Đã tải!'; btn.disabled = false;
+  setTimeout(function() { btn.innerHTML = origText; }, 3000);
+}
+function errBtn(btn, origText, err) {
+  btn.innerHTML = '❌ ' + err; btn.disabled = false;
+  setTimeout(function() { btn.innerHTML = origText; }, 4000);
+}
+
+// ===== CROP ẢNH TRỰC TIẾP (khi file là image, không phải PDF) =====
+function cropImageTo34(b64Content, mime, onOK, onErr) {
+  var img = new Image();
+  img.onload = function() {
+    // Dùng ảnh gốc làm source, crop ra 3:4
+    cropSourceTo34(img, img.naturalWidth, img.naturalHeight, onOK, onErr);
+  };
+  img.onerror = function() { onErr('Không đọc được ảnh'); };
+  img.src = 'data:' + mime + ';base64,' + b64Content;
+}
+
+// ===== CROP CANVAS/IMAGE → 3:4 chuẩn VN =====
+function cropSourceTo34(source, srcW, srcH, onOK, onErr) {
+  var TARGET_RATIO = 3 / 4;
+  var srcRatio = srcW / srcH;
+  var cropX, cropY, cropW, cropH;
+
+  if (srcRatio > TARGET_RATIO) {
+    cropH = srcH; cropW = Math.round(srcH * TARGET_RATIO);
+    cropX = Math.round((srcW - cropW) / 2); cropY = 0;
+  } else {
+    cropW = srcW; cropH = Math.round(srcW / TARGET_RATIO);
+    cropX = 0; cropY = Math.round((srcH - cropH) / 2);
+  }
+
+  var OUT_W = 354, OUT_H = 472; // 3x4cm @ 300DPI
+  var outCanvas = document.createElement('canvas');
+  outCanvas.width = OUT_W; outCanvas.height = OUT_H;
+  var ctx = outCanvas.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(source, cropX, cropY, cropW, cropH, 0, 0, OUT_W, OUT_H);
+
+  outCanvas.toBlob(function(blob) {
+    if (blob) onOK(blob); else onErr('Không tạo được ảnh');
+  }, 'image/jpeg', 0.95);
+}
+
+// ===== CHUYỂN PDF → ẢNH 3x4 =====
 var _pdfjsLoaded = null;
 function loadPdfJs(cb) {
   if (_pdfjsLoaded) { cb(_pdfjsLoaded); return; }
   import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs').then(function(mod) {
     mod.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
-    _pdfjsLoaded = mod;
-    cb(mod);
-  });
+    _pdfjsLoaded = mod; cb(mod);
+  }).catch(function() { cb(null); });
 }
 
-// Chuyển PDF base64 → ảnh JPG 3x4 chuẩn VN
 function convertPdfToPhoto34(pdfjsLib, b64Content, onOK, onErr) {
+  if (!pdfjsLib) { onErr('Không tải được PDF.js'); return; }
   try {
-    // Decode base64 → Uint8Array
     var raw = atob(b64Content);
     var pdfBytes = new Uint8Array(raw.length);
     for (var i = 0; i < raw.length; i++) pdfBytes[i] = raw.charCodeAt(i);
 
     pdfjsLib.getDocument({ data: pdfBytes }).promise.then(function(pdf) {
       pdf.getPage(1).then(function(page) {
-        // Render ở scale cao để giữ nét (scale=4 → ~300DPI cho A4)
         var scale = 4;
         var viewport = page.getViewport({ scale: scale });
-
         var canvas = document.createElement('canvas');
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
+        canvas.width = viewport.width; canvas.height = viewport.height;
         var ctx = canvas.getContext('2d');
 
         page.render({ canvasContext: ctx, viewport: viewport }).promise.then(function() {
-          // Crop center theo tỉ lệ 3:4
-          var TARGET_RATIO = 3 / 4; // 0.75
-          var srcW = canvas.width, srcH = canvas.height;
-          var srcRatio = srcW / srcH;
-          var cropX, cropY, cropW, cropH;
-
-          if (srcRatio > TARGET_RATIO) {
-            // Rộng hơn → cắt 2 bên
-            cropH = srcH;
-            cropW = Math.round(srcH * TARGET_RATIO);
-            cropX = Math.round((srcW - cropW) / 2);
-            cropY = 0;
-          } else {
-            // Cao hơn → cắt trên dưới
-            cropW = srcW;
-            cropH = Math.round(srcW / TARGET_RATIO);
-            cropX = 0;
-            cropY = Math.round((srcH - cropH) / 2);
-          }
-
-          // Output: 3x4cm @ 300DPI = 354x472px
-          var OUT_W = 354, OUT_H = 472;
-          var outCanvas = document.createElement('canvas');
-          outCanvas.width = OUT_W;
-          outCanvas.height = OUT_H;
-          var outCtx = outCanvas.getContext('2d');
-          outCtx.imageSmoothingEnabled = true;
-          outCtx.imageSmoothingQuality = 'high';
-          outCtx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, OUT_W, OUT_H);
-
-          outCanvas.toBlob(function(blob) {
-            if (blob) onOK(blob);
-            else onErr('Không tạo được ảnh');
-          }, 'image/jpeg', 0.95);
+          cropSourceTo34(canvas, canvas.width, canvas.height, onOK, onErr);
         });
       });
     }).catch(function(e) { onErr('Lỗi đọc PDF: ' + e.message); });
   } catch (e) { onErr('Lỗi: ' + e.message); }
+}
+
+// ===== XÓA FILE =====
+function deleteFile(btn, fileId, docType) {
+  var labels = DATA.doc_labels || {};
+  var docName = labels[docType] || docType;
+
+  // Hiện hộp thoại xác nhận đẹp
+  var overlay = document.createElement('div');
+  overlay.className = 'confirm-overlay';
+  overlay.innerHTML =
+    '<div class="confirm-box">' +
+      '<div class="confirm-title">⚠️ Xác nhận xóa</div>' +
+      '<div class="confirm-msg">Bạn có chắc muốn xóa file <strong>' + esc(docName) + '</strong>?<br>Hành động này không thể hoàn tác!</div>' +
+      '<div class="confirm-btns">' +
+        '<button class="confirm-cancel" id="confirm-no">Hủy</button>' +
+        '<button class="confirm-ok" id="confirm-yes">🗑️ Xóa</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+
+  overlay.querySelector('#confirm-no').onclick = function() { document.body.removeChild(overlay); };
+  overlay.querySelector('#confirm-yes').onclick = function() {
+    document.body.removeChild(overlay);
+    doDelete(btn, fileId, docType);
+  };
+}
+
+function doDelete(btn, fileId, docType) {
+  var origText = btn.innerHTML;
+  btn.innerHTML = '⏳ Đang xóa...';
+  btn.disabled = true;
+
+  // Chặn đóng trình duyệt khi đang xóa
+  window.onbeforeunload = function() { return 'Đang xóa file, vui lòng chờ!'; };
+
+  fetchAPI('delete_file', { id: fileId, 'class': currentClass }, function(data) {
+    window.onbeforeunload = null;
+    // Cập nhật data local
+    if (currentStudent && currentStudent.docs && currentStudent.docs[docType]) {
+      delete currentStudent.docs[docType];
+      currentStudent.doc_count = Math.max(0, (currentStudent.doc_count || 1) - 1);
+    }
+    // Re-render lại danh sách tài liệu
+    selectStudent(currentStudent);
+  }, function(err) {
+    window.onbeforeunload = null;
+    btn.innerHTML = '❌ ' + err;
+    btn.disabled = false;
+    setTimeout(function() { btn.innerHTML = origText; }, 3000);
+  });
 }
 
 function triggerDownload(blob, name) {
@@ -502,6 +573,7 @@ window.selectStudent = selectStudent;
 window.filterStudents = filterStudents;
 window.downloadAll = downloadAll;
 window.downloadPhoto34 = downloadPhoto34;
+window.deleteFile = deleteFile;
 </script>
 </body>
 </html>
