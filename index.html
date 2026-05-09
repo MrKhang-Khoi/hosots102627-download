@@ -343,15 +343,52 @@ function selectStudent(s) {
 
 // ===== TẢI TẤT CẢ (NÉN ZIP) =====
 function downloadAll() {
-  if (!currentStudent || !currentStudent.folder_name) return;
+  if (!currentStudent) return;
 
   var btn = document.getElementById('download-all-btn');
   var originalText = btn.innerHTML;
+
+  // Kiểm tra folder_name (cache cũ có thể chưa có)
+  if (!currentStudent.folder_name) {
+    btn.innerHTML = '⏳ Đang cập nhật dữ liệu...';
+    btn.style.opacity = '.7';
+    btn.style.pointerEvents = 'none';
+    // Refresh cache rồi tải lại danh sách HS
+    fetchAPI('refresh', {}, function() {
+      fetchAPI('students', { 'class': currentClass }, function(data) {
+        var students = data.students || [];
+        for (var i = 0; i < students.length; i++) {
+          if (students[i].ho_ten === currentStudent.ho_ten) {
+            currentStudent = students[i];
+            break;
+          }
+        }
+        btn.style.opacity = '1';
+        btn.style.pointerEvents = '';
+        if (currentStudent.folder_name) {
+          btn.innerHTML = originalText;
+          downloadAll(); // Thử lại
+        } else {
+          btn.innerHTML = '❌ Không tìm thấy thư mục HS';
+          setTimeout(function() { btn.innerHTML = originalText; }, 3000);
+        }
+      }, function() {
+        btn.innerHTML = '❌ Lỗi tải dữ liệu';
+        btn.style.opacity = '1'; btn.style.pointerEvents = '';
+        setTimeout(function() { btn.innerHTML = originalText; }, 3000);
+      });
+    }, function() {
+      btn.innerHTML = '❌ Lỗi refresh cache';
+      btn.style.opacity = '1'; btn.style.pointerEvents = '';
+      setTimeout(function() { btn.innerHTML = originalText; }, 3000);
+    });
+    return;
+  }
+
   btn.innerHTML = '⏳ Đang nén hồ sơ, vui lòng chờ...';
   btn.style.opacity = '.7';
   btn.style.pointerEvents = 'none';
 
-  // Tên prefix: TenHS_Lop (bỏ khoảng trắng)
   var prefix = (currentStudent.ho_ten || '').replace(/\s+/g, '') + '_' + currentClass;
 
   fetchAPI('zip', {
@@ -359,32 +396,36 @@ function downloadAll() {
     'folder': currentStudent.folder_name,
     'prefix': prefix
   }, function(data) {
-    // Giải mã base64 → tạo file ZIP → tải xuống
-    var raw = atob(data.content);
-    var arr = new Uint8Array(raw.length);
-    for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
-    var blob = new Blob([arr], { type: 'application/zip' });
+    if (!data.content) {
+      resetBtn(btn, originalText, '❌ Server trả về rỗng');
+      return;
+    }
+    try {
+      var raw = atob(data.content);
+      var arr = new Uint8Array(raw.length);
+      for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+      var blob = new Blob([arr], { type: 'application/zip' });
 
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = data.name || 'HoSo.zip';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+      triggerDownload(blob, data.name || 'HoSo.zip');
 
-    btn.innerHTML = '✅ Đã tải ' + esc(data.name) + '!';
-    btn.style.background = 'linear-gradient(135deg, #2e7d32, #43a047)';
-    btn.style.opacity = '1';
-    btn.style.pointerEvents = '';
-    setTimeout(function() { btn.innerHTML = originalText; btn.style.background = ''; }, 4000);
+      btn.innerHTML = '✅ Đã tải ' + esc(data.name) + '!';
+      btn.style.background = 'linear-gradient(135deg, #2e7d32, #43a047)';
+      btn.style.opacity = '1';
+      btn.style.pointerEvents = '';
+      setTimeout(function() { btn.innerHTML = originalText; btn.style.background = ''; }, 4000);
+    } catch (e) {
+      resetBtn(btn, originalText, '❌ Lỗi giải mã: ' + e.message);
+    }
   }, function(err) {
-    btn.innerHTML = '❌ Lỗi: ' + esc(err);
-    btn.style.opacity = '1';
-    btn.style.pointerEvents = '';
-    setTimeout(function() { btn.innerHTML = originalText; }, 4000);
+    resetBtn(btn, originalText, '❌ Lỗi: ' + err);
   });
+}
+
+function resetBtn(btn, origText, msg) {
+  btn.innerHTML = msg;
+  btn.style.opacity = '1';
+  btn.style.pointerEvents = '';
+  setTimeout(function() { btn.innerHTML = origText; btn.style.background = ''; }, 4000);
 }
 
 // ===== HELPERS =====
