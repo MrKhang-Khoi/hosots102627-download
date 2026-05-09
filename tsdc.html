@@ -111,6 +111,7 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:var(--bg);color:var(--te
     <div id="panel-overview" class="panel">
       <div class="stat-row" id="stat-cards"></div>
       <div class="card"><h3>📈 Trạng thái hồ sơ</h3><table class="nv-tbl" id="status-tbl"><thead><tr><th>Trạng thái</th><th style="width:80px">Số lượng</th><th style="width:40%">Tỷ lệ</th></tr></thead><tbody></tbody></table></div>
+      <div class="card"><h3>📋 Thống kê chi tiết theo lớp</h3><div class="tbl-wrap"><table class="stu-tbl" id="detail-stats-tbl"><thead><tr><th class="stt">STT</th><th>Lớp</th><th>TS HS<br>Lớp 9</th><th>Đăng ký TS<br>vào lớp 10</th><th>Chưa<br>đăng ký</th><th>Chờ xét<br>duyệt</th><th>Đã xét<br>duyệt</th></tr></thead><tbody id="detail-stats-tbody"></tbody></table></div></div>
     </div>
 
     <!-- ASPIRATIONS -->
@@ -131,6 +132,7 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:var(--bg);color:var(--te
       <div class="search-row">
         <input type="text" id="stu-search" placeholder="🔍 Tìm theo tên, mã HS, CCCD..." oninput="filterStu()">
         <select id="stu-class-filter" onchange="filterStu()"><option value="">Tất cả lớp</option></select>
+        <select id="stu-nv1-filter" onchange="filterStu()"><option value="">Tất cả NV1</option></select>
         <select id="stu-status-filter" onchange="filterStu()"><option value="">Tất cả trạng thái</option></select>
       </div>
       <div class="count-info" id="stu-count"></div>
@@ -143,8 +145,9 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:var(--bg);color:var(--te
 
 <script>
 var TSDC_API = 'https://script.google.com/macros/s/AKfycbzIxSlNum5oRdASLpAKRgnt_GYefUx2uwtCmu9OzKmtpKr0Zi3AnYyKOhaDSunvhsxC/exec';
+var HOSO_API = 'https://script.google.com/macros/s/AKfycbyZjlU-kBMQ2WqGZwH-dZWHcJfxZB_NNLU8j636znWtyuchjVL2iZP6vikuLZqmO2Bd/exec';
 var PASSWORD = 'Cva@2025';
-var STATS = null, ALL_STUDENTS = [];
+var STATS = null, ALL_STUDENTS = [], CLASS_SIZES = {};
 
 function doLogin(){
   var pw = document.getElementById('pw-input').value;
@@ -160,14 +163,13 @@ function doLogin(){
 
 function loadData(){
   document.getElementById('dash-loading').style.display='block';
-  // Load stats
-  var url1 = TSDC_API+'?action=stats';
-  var url2 = TSDC_API+'?action=all';
   Promise.all([
-    fetch(url1,{redirect:'follow'}).then(function(r){return r.json()}),
-    fetch(url2,{redirect:'follow'}).then(function(r){return r.json()})
+    fetch(TSDC_API+'?action=stats',{redirect:'follow'}).then(function(r){return r.json()}),
+    fetch(TSDC_API+'?action=all',{redirect:'follow'}).then(function(r){return r.json()}),
+    fetch(HOSO_API+'?action=classes',{redirect:'follow'}).then(function(r){return r.json()}).catch(function(){return {classes:[]}})
   ]).then(function(res){
     STATS = res[0]; ALL_STUDENTS = res[1].students||[];
+    (res[2].classes||[]).forEach(function(c){ CLASS_SIZES[c.name]=c.count; });
     document.getElementById('dash-loading').style.display='none';
     document.getElementById('updated-at').textContent='Cập nhật: '+(STATS.updated_at||res[1].updated_at||'—');
     renderOverview();renderAspirations();renderClasses();renderStudents();
@@ -209,6 +211,29 @@ function renderOverview(){
     var pct=total?Math.round(st[k]/total*100):0;
     tbody.innerHTML+='<tr><td>'+esc(k)+'</td><td><strong>'+st[k]+'</strong></td><td><div class="nv-bar" style="width:'+pct+'%"></div> '+pct+'%</td></tr>';
   });
+  renderDetailStats();
+}
+function renderDetailStats(){
+  if(!STATS||!STATS.byClass) return;
+  var classes=Object.keys(STATS.byClass).sort();
+  var tbody=document.getElementById('detail-stats-tbody');tbody.innerHTML='';
+  var sumTS=0,sumDK=0,sumChua=0,sumCho=0,sumDuyet=0;
+  classes.forEach(function(lop,i){
+    var c=STATS.byClass[lop];
+    var tsLop9=CLASS_SIZES[lop]||c.total;
+    var dk=c.total;
+    var chua=Math.max(tsLop9-dk,0);
+    var cho=0,duyet=0;
+    Object.keys(c.status||{}).forEach(function(k){
+      if(k.indexOf('xét duyệt')>=0||k.indexOf('tiếp nhận')>=0) duyet+=c.status[k];
+      else if(k.indexOf('Chờ')>=0) cho+=c.status[k];
+      else cho+=c.status[k];
+    });
+    sumTS+=tsLop9;sumDK+=dk;sumChua+=chua;sumCho+=cho;sumDuyet+=duyet;
+    var chuaStyle=chua>0?'color:#c62828;font-weight:700':'';
+    tbody.innerHTML+='<tr><td class="stt">'+(i+1)+'</td><td><strong>'+esc(lop)+'</strong></td><td>'+tsLop9+'</td><td style="color:#1565C0;font-weight:700">'+dk+'</td><td style="'+chuaStyle+'">'+chua+'</td><td>'+cho+'</td><td style="color:#2e7d32;font-weight:700">'+duyet+'</td></tr>';
+  });
+  tbody.innerHTML+='<tr style="background:#f0f4f8;font-weight:800"><td></td><td>Tổng</td><td>'+sumTS+'</td><td style="color:#1565C0">'+sumDK+'</td><td style="color:#c62828">'+sumChua+'</td><td>'+sumCho+'</td><td style="color:#2e7d32">'+sumDuyet+'</td></tr>';
 }
 
 // ===== ASPIRATIONS =====
@@ -264,11 +289,16 @@ function showClassDetail(lop){
 
 // ===== STUDENTS =====
 function renderStudents(){
-  // Populate filters
-  var classSet={},statusSet={};
-  ALL_STUDENTS.forEach(function(s){if(s.lop)classSet[s.lop]=1;if(s.trangThai)statusSet[s.trangThai]=1});
+  var classSet={},statusSet={},nv1Set={};
+  ALL_STUDENTS.forEach(function(s){
+    if(s.lop)classSet[s.lop]=1;
+    if(s.trangThai)statusSet[s.trangThai]=1;
+    if(s.nv1)nv1Set[s.nv1]=1;
+  });
   var cf=document.getElementById('stu-class-filter');
   Object.keys(classSet).sort().forEach(function(c){var o=document.createElement('option');o.value=c;o.textContent='Lớp '+c;cf.appendChild(o)});
+  var nf=document.getElementById('stu-nv1-filter');
+  Object.keys(nv1Set).sort().forEach(function(n){var o=document.createElement('option');o.value=n;o.textContent=n;nf.appendChild(o)});
   var sf=document.getElementById('stu-status-filter');
   Object.keys(statusSet).sort().forEach(function(s){var o=document.createElement('option');o.value=s;o.textContent=s;sf.appendChild(o)});
   filterStu();
@@ -276,9 +306,11 @@ function renderStudents(){
 function filterStu(){
   var q=(document.getElementById('stu-search').value||'').toLowerCase();
   var cf=document.getElementById('stu-class-filter').value;
+  var nf=document.getElementById('stu-nv1-filter').value;
   var sf=document.getElementById('stu-status-filter').value;
   var filtered=ALL_STUDENTS.filter(function(s){
     if(cf&&s.lop!==cf)return false;
+    if(nf&&s.nv1!==nf)return false;
     if(sf&&s.trangThai!==sf)return false;
     if(q){
       var hay=(s.hoTen||'').toLowerCase()+(s.maHocSinh||'').toLowerCase()+(s.soCCCD||'')+(s.maDinhDanh||'')+(s.lop||'').toLowerCase();
