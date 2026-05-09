@@ -583,6 +583,15 @@ function doDelete(btn, fileId, docType) {
 
   fetchAPI('delete_file', { id: fileId, 'class': currentClass }, function(data) {
     window.onbeforeunload = null;
+
+    // Kiểm tra server XÁC NHẬN đã xóa (tránh trường hợp deploy cũ)
+    if (!data.success) {
+      btn.innerHTML = '❌ Server chưa hỗ trợ xóa. Hãy re-deploy Apps Script!';
+      btn.disabled = false;
+      setTimeout(function() { btn.innerHTML = origText; }, 5000);
+      return;
+    }
+
     // Cập nhật data local
     if (currentStudent && currentStudent.docs && currentStudent.docs[docType]) {
       delete currentStudent.docs[docType];
