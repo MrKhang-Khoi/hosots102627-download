@@ -65,6 +65,9 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:var(--bg);color:var(--te
 .stu-tbl .stt{width:36px;text-align:center}
 .badge{display:inline-block;padding:3px 8px;border-radius:6px;font-size:.68rem;font-weight:600}
 .badge-ok{background:#e8f5e9;color:#2e7d32}.badge-wait{background:#fff8e1;color:#f57f17}.badge-other{background:#e3e8ef;color:#64748b}
+/* GHI CHÚ - Điều chỉnh lại badge */
+.badge-adjust{background:linear-gradient(135deg,#ff1744,#ff6d00);color:#fff;font-weight:700;font-size:.72rem;padding:4px 10px;border-radius:8px;animation:pulseAdjust 2s ease-in-out infinite;box-shadow:0 2px 8px rgba(255,23,68,.35);letter-spacing:.3px}
+@keyframes pulseAdjust{0%,100%{box-shadow:0 2px 8px rgba(255,23,68,.35);transform:scale(1)}50%{box-shadow:0 4px 16px rgba(255,23,68,.55);transform:scale(1.04)}}
 .tbl-wrap{overflow-x:auto;border-radius:12px;border:1px solid #e3e8ef}
 .count-info{font-size:.78rem;color:var(--sub);margin-bottom:8px}
 /* LOADING */
@@ -134,10 +137,15 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:var(--bg);color:var(--te
         <select id="stu-class-filter" onchange="filterStu()"><option value="">Tất cả lớp</option></select>
         <select id="stu-nv1-filter" onchange="filterStu()"><option value="">Tất cả NV1</option></select>
         <select id="stu-status-filter" onchange="filterStu()"><option value="">Tất cả trạng thái</option></select>
+        <select id="stu-note-filter" onchange="filterStu()" style="border-color:#ff6d00">
+          <option value="">Tất cả ghi chú</option>
+          <option value="adjust">⚠ Chỉ đăng ký 1 NV</option>
+          <option value="ok">✅ Đủ ≥ 2 NV</option>
+        </select>
       </div>
       <div class="count-info" id="stu-count"></div>
       <div class="tbl-wrap"><table class="stu-tbl"><thead><tr>
-        <th class="stt">STT</th><th>Họ tên</th><th>Lớp</th><th>Ngày sinh</th><th>CCCD</th><th>Trạng thái</th><th>NV1</th><th>NV2</th><th>NV3</th>
+        <th class="stt">STT</th><th>Họ tên</th><th>Lớp</th><th>Ngày sinh</th><th>CCCD</th><th>Trạng thái</th><th>NV1</th><th>NV2</th><th>NV3</th><th style="min-width:110px">Ghi chú</th>
       </tr></thead><tbody id="stu-tbody"></tbody></table></div>
     </div>
   </div>
@@ -303,15 +311,28 @@ function renderStudents(){
   Object.keys(statusSet).sort().forEach(function(s){var o=document.createElement('option');o.value=s;o.textContent=s;sf.appendChild(o)});
   filterStu();
 }
+function countNV(s){
+  var cnt=0;
+  if(s.nv1&&s.nv1!=='—'&&s.nv1!=='-'&&s.nv1.trim()!=='')cnt++;
+  if(s.nv2&&s.nv2!=='—'&&s.nv2!=='-'&&s.nv2.trim()!=='')cnt++;
+  if(s.nv3&&s.nv3!=='—'&&s.nv3!=='-'&&s.nv3.trim()!=='')cnt++;
+  return cnt;
+}
 function filterStu(){
   var q=(document.getElementById('stu-search').value||'').toLowerCase();
   var cf=document.getElementById('stu-class-filter').value;
   var nf=document.getElementById('stu-nv1-filter').value;
   var sf=document.getElementById('stu-status-filter').value;
+  var noteF=document.getElementById('stu-note-filter').value;
   var filtered=ALL_STUDENTS.filter(function(s){
     if(cf&&s.lop!==cf)return false;
     if(nf&&s.nv1!==nf)return false;
     if(sf&&s.trangThai!==sf)return false;
+    if(noteF){
+      var nvCount=countNV(s);
+      if(noteF==='adjust'&&nvCount!==1)return false;
+      if(noteF==='ok'&&nvCount<2)return false;
+    }
     if(q){
       var hay=(s.hoTen||'').toLowerCase()+(s.maHocSinh||'').toLowerCase()+(s.soCCCD||'')+(s.maDinhDanh||'')+(s.lop||'').toLowerCase();
       if(hay.indexOf(q)<0)return false;
@@ -324,7 +345,16 @@ function filterStu(){
     var badge='badge-other',st=s.trangThai||'';
     if(st.indexOf('xét duyệt')>=0||st.indexOf('tiếp nhận')>=0) badge='badge-ok';
     else if(st.indexOf('Chờ')>=0) badge='badge-wait';
-    tbody.innerHTML+='<tr>'+
+    var nvCount=countNV(s);
+    var noteTd='';
+    if(nvCount===1){
+      noteTd='<td><span class="badge badge-adjust">⚠ Điều chỉnh lại</span></td>';
+    } else if(nvCount===0){
+      noteTd='<td><span class="badge badge-other">Chưa có NV</span></td>';
+    } else {
+      noteTd='<td></td>';
+    }
+    tbody.innerHTML+='<tr'+(nvCount===1?' style="background:#fff5f5"':'')+'>'+
       '<td class="stt">'+(i+1)+'</td>'+
       '<td><strong>'+esc(s.hoTen||'')+'</strong></td>'+
       '<td>'+esc(s.lop||'')+'</td>'+
@@ -333,7 +363,8 @@ function filterStu(){
       '<td><span class="badge '+badge+'">'+esc(st||'—')+'</span></td>'+
       '<td style="font-size:.72rem">'+esc(s.nv1||'—')+'</td>'+
       '<td style="font-size:.72rem">'+esc(s.nv2||'—')+'</td>'+
-      '<td style="font-size:.72rem">'+esc(s.nv3||'—')+'</td></tr>';
+      '<td style="font-size:.72rem">'+esc(s.nv3||'—')+'</td>'+
+      noteTd+'</tr>';
   });
 }
 </script>
