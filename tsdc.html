@@ -74,7 +74,12 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:var(--bg);color:var(--te
 .ld{text-align:center;padding:60px}.ld-sp{width:40px;height:40px;border:4px solid #e3e8ef;border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 12px}
 @keyframes sp{to{transform:rotate(360deg)}}
 .ld-txt{color:var(--sub);font-size:.85rem}
-@media(max-width:600px){.stat-row{grid-template-columns:repeat(2,1fr)}.cls-grid{grid-template-columns:1fr 1fr}.stu-tbl{font-size:.7rem}}
+@media(max-width:600px){.stat-row{grid-template-columns:repeat(2,1fr)}.cls-grid{grid-template-columns:1fr 1fr}.stu-tbl{font-size:.7rem}.nv-grid{grid-template-columns:1fr}}
+/* NV GRID */
+.nv-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:0}
+@media(max-width:900px){.nv-grid{grid-template-columns:1fr}}
+/* SECTION DIVIDER */
+.section-sep{border:none;border-top:2px solid #e3e8ef;margin:24px 0 20px}
 </style>
 </head>
 <body>
@@ -103,31 +108,22 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:var(--bg);color:var(--te
     <!-- TABS -->
     <div class="tabs" id="tabs">
       <button class="tab active" onclick="showTab('overview')">📊 Tổng quan</button>
-      <button class="tab" onclick="showTab('aspirations')">🎯 Nguyện vọng</button>
-      <button class="tab" onclick="showTab('classes')">🏫 Theo lớp</button>
       <button class="tab" onclick="showTab('students')">👤 Danh sách HS</button>
     </div>
 
     <div id="dash-loading" class="ld"><div class="ld-sp"></div><div class="ld-txt">Đang tải dữ liệu TSDC...</div></div>
 
-    <!-- OVERVIEW -->
+    <!-- OVERVIEW (merged: stats + class detail + aspirations) -->
     <div id="panel-overview" class="panel">
       <div class="stat-row" id="stat-cards"></div>
       <div class="card"><h3>📈 Trạng thái hồ sơ</h3><table class="nv-tbl" id="status-tbl"><thead><tr><th>Trạng thái</th><th style="width:80px">Số lượng</th><th style="width:40%">Tỷ lệ</th></tr></thead><tbody></tbody></table></div>
       <div class="card"><h3>📋 Thống kê chi tiết theo lớp</h3><div class="tbl-wrap"><table class="stu-tbl" id="detail-stats-tbl"><thead id="detail-stats-thead"></thead><tbody id="detail-stats-tbody"></tbody></table></div></div>
-    </div>
-
-    <!-- ASPIRATIONS -->
-    <div id="panel-aspirations" class="panel">
-      <div class="card"><h3>🥇 Nguyện vọng 1</h3><table class="nv-tbl" id="nv1-tbl"><thead><tr><th>Trường THPT</th><th style="width:80px">Số lượng</th><th style="width:40%">Tỷ lệ</th></tr></thead><tbody></tbody></table></div>
-      <div class="card"><h3>🥈 Nguyện vọng 2</h3><table class="nv-tbl" id="nv2-tbl"><thead><tr><th>Trường THPT</th><th style="width:80px">Số lượng</th><th style="width:40%">Tỷ lệ</th></tr></thead><tbody></tbody></table></div>
-      <div class="card"><h3>🥉 Nguyện vọng 3</h3><table class="nv-tbl" id="nv3-tbl"><thead><tr><th>Trường THPT</th><th style="width:80px">Số lượng</th><th style="width:40%">Tỷ lệ</th></tr></thead><tbody></tbody></table></div>
-    </div>
-
-    <!-- CLASSES -->
-    <div id="panel-classes" class="panel">
-      <div class="cls-grid" id="cls-grid"></div>
-      <div class="card" id="cls-detail" style="display:none"><h3 id="cls-detail-title"></h3><div id="cls-detail-body"></div></div>
+      <hr class="section-sep">
+      <div class="nv-grid">
+        <div class="card"><h3>🥇 Nguyện vọng 1</h3><table class="nv-tbl" id="nv1-tbl"><thead><tr><th>Trường THPT</th><th style="width:60px">SL</th><th style="width:35%">Tỷ lệ</th></tr></thead><tbody></tbody></table></div>
+        <div class="card"><h3>🥈 Nguyện vọng 2</h3><table class="nv-tbl" id="nv2-tbl"><thead><tr><th>Trường THPT</th><th style="width:60px">SL</th><th style="width:35%">Tỷ lệ</th></tr></thead><tbody></tbody></table></div>
+        <div class="card"><h3>🥉 Nguyện vọng 3</h3><table class="nv-tbl" id="nv3-tbl"><thead><tr><th>Trường THPT</th><th style="width:60px">SL</th><th style="width:35%">Tỷ lệ</th></tr></thead><tbody></tbody></table></div>
+      </div>
     </div>
 
     <!-- STUDENTS -->
@@ -180,7 +176,7 @@ function loadData(){
     (res[2].classes||[]).forEach(function(c){ CLASS_SIZES[c.name]=c.count; });
     document.getElementById('dash-loading').style.display='none';
     document.getElementById('updated-at').textContent='Cập nhật: '+(STATS.updated_at||res[1].updated_at||'—');
-    renderOverview();renderAspirations();renderClasses();renderStudents();
+    renderOverview();renderAspirations();renderStudents();
     showTab('overview');
   }).catch(function(e){
     document.getElementById('dash-loading').innerHTML='<div style="color:#c62828">❌ Lỗi tải dữ liệu: '+e.message+'</div>';
@@ -192,7 +188,7 @@ function showTab(id){
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active')});
   document.getElementById('panel-'+id).classList.add('active');
   var tabs=document.querySelectorAll('.tab');
-  var map={overview:0,aspirations:1,classes:2,students:3};
+  var map={overview:0,students:1};
   if(tabs[map[id]]) tabs[map[id]].classList.add('active');
 }
 
@@ -289,8 +285,7 @@ function renderDetailStats(){
   var hdrRow2='<tr><th style="text-align:center">TS</th>';
   var schoolColors=['#E65100','#1B5E20','#4A148C','#01579B','#BF360C','#311B92'];
   schoolCols.forEach(function(sc,idx){
-    var color=schoolColors[idx%schoolColors.length];
-    hdrRow2+='<th style="text-align:center;min-width:80px;color:'+color+'">'+esc(shortName(sc.label))+'</th>';
+    hdrRow2+='<th style="text-align:center;min-width:80px;font-weight:700">'+esc(shortName(sc.label))+'</th>';
   });
   hdrRow2+='</tr>';
   thead.innerHTML=hdrRow1+hdrRow2;
@@ -336,15 +331,28 @@ function renderDetailStats(){
   tbody.innerHTML+=totalRow;
 }
 
-// ===== ASPIRATIONS =====
+// ===== ASPIRATIONS (built from ALL_STUDENTS for auto-detect) =====
 function renderAspirations(){
-  if(!STATS) return;
-  renderNvTable('nv1-tbl',STATS.nv1||[]);
-  renderNvTable('nv2-tbl',STATS.nv2||[]);
-  renderNvTable('nv3-tbl',STATS.nv3||[]);
+  if(!ALL_STUDENTS.length) return;
+  var total=ALL_STUDENTS.length;
+  function extractSchool(v){
+    if(!v||v==='—'||v==='-'||v.trim()==='') return '';
+    return v.split('\n')[0].trim();
+  }
+  function buildMap(field){
+    var map={};
+    ALL_STUDENTS.forEach(function(s){
+      var name=extractSchool(s[field]);
+      if(name) map[name]=(map[name]||0)+1;
+    });
+    return Object.keys(map).map(function(k){return [k,map[k]]}).sort(function(a,b){return b[1]-a[1]});
+  }
+  renderNvTable('nv1-tbl',buildMap('nv1'),total);
+  renderNvTable('nv2-tbl',buildMap('nv2'),total);
+  renderNvTable('nv3-tbl',buildMap('nv3'),total);
 }
-function renderNvTable(id,arr){
-  var total=STATS.total||1;
+function renderNvTable(id,arr,total){
+  total=total||ALL_STUDENTS.length||1;
   var tbody=document.querySelector('#'+id+' tbody');tbody.innerHTML='';
   if(!arr.length){tbody.innerHTML='<tr><td colspan="3" style="text-align:center;color:#aaa">Chưa có dữ liệu</td></tr>';return}
   arr.forEach(function(item){
@@ -352,39 +360,6 @@ function renderNvTable(id,arr){
     var pct=Math.round(count/total*100);
     tbody.innerHTML+='<tr><td>'+esc(name)+'</td><td><strong>'+count+'</strong></td><td><div class="nv-bar" style="width:'+pct+'%"></div> '+pct+'%</td></tr>';
   });
-}
-
-// ===== CLASSES =====
-function renderClasses(){
-  if(!STATS||!STATS.byClass) return;
-  var grid=document.getElementById('cls-grid');grid.innerHTML='';
-  var classes=Object.keys(STATS.byClass).sort();
-  classes.forEach(function(lop){
-    var c=STATS.byClass[lop];
-    var card=document.createElement('div');card.className='cls-card';
-    card.onclick=function(){showClassDetail(lop)};
-    var accepted=0;Object.keys(c.status||{}).forEach(function(k){if(classifyStatus(k)==='accepted')accepted+=c.status[k]});
-    var pct=c.total?Math.round(accepted/c.total*100):0;
-    card.innerHTML='<div class="cn">🏫 Lớp '+esc(lop)+'</div><div class="ct">'+c.total+' học sinh đăng ký</div>'+
-      '<div class="bar"><span style="width:'+pct+'%;background:#2e7d32"></span><span style="width:'+(100-pct)+'%;background:#e3e8ef"></span></div>'+
-      '<div class="ct" style="margin-top:4px">Đã tiếp nhận: '+pct+'%</div>';
-    grid.appendChild(card);
-  });
-}
-function showClassDetail(lop){
-  var c=STATS.byClass[lop];if(!c)return;
-  var d=document.getElementById('cls-detail');d.style.display='block';
-  document.getElementById('cls-detail-title').textContent='📋 Chi tiết lớp '+lop+' ('+c.total+' HS)';
-  var html='<h4 style="font-size:.85rem;margin:12px 0 8px">Trạng thái</h4><table class="nv-tbl"><tbody>';
-  Object.keys(c.status||{}).forEach(function(k){html+='<tr><td>'+esc(k)+'</td><td><strong>'+c.status[k]+'</strong></td></tr>'});
-  html+='</tbody></table>';
-  if(c.nv1&&c.nv1.length){
-    html+='<h4 style="font-size:.85rem;margin:16px 0 8px">Nguyện vọng 1</h4><table class="nv-tbl"><tbody>';
-    c.nv1.forEach(function(n){html+='<tr><td>'+esc(n[0])+'</td><td><strong>'+n[1]+'</strong></td></tr>'});
-    html+='</tbody></table>';
-  }
-  document.getElementById('cls-detail-body').innerHTML=html;
-  d.scrollIntoView({behavior:'smooth'});
 }
 
 // ===== STUDENTS =====
