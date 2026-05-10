@@ -18,16 +18,31 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:var(--bg);color:var(--te
 #login-screen{display:flex;align-items:center;justify-content:center;min-height:60vh}
 .login-box{background:var(--card);border-radius:var(--r);padding:40px 32px;box-shadow:var(--sh);text-align:center;max-width:380px;width:100%}
 .login-box h2{font-size:1.1rem;margin-bottom:8px;color:var(--pd)}.login-box p{font-size:.82rem;color:var(--sub);margin-bottom:20px}
-.login-box input{width:100%;padding:12px 16px;border:2px solid #e3e8ef;border-radius:12px;font-size:.9rem;font-family:inherit;outline:none;text-align:center;margin-bottom:12px}
+.pw-wrap{position:relative;width:100%;margin-bottom:12px}
+.pw-wrap input{width:100%;padding:12px 44px 12px 16px;border:2px solid #e3e8ef;border-radius:12px;font-size:.9rem;font-family:inherit;outline:none;text-align:center;margin-bottom:0}
+.pw-wrap input:focus{border-color:var(--p)}
+.pw-toggle{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1.1rem;color:var(--sub);padding:4px;line-height:1;transition:color .2s}
+.pw-toggle:hover{color:var(--p)}
 .login-box input:focus{border-color:var(--p)}
 .login-box button{width:100%;padding:12px;background:var(--p);color:#fff;border:none;border-radius:12px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:inherit}
 .login-box button:hover{background:var(--pd)}
 .login-err{color:var(--err);font-size:.8rem;margin-top:8px;display:none}
 /* DASHBOARD */
 #dashboard{display:none}
-.back-link{display:inline-flex;align-items:center;gap:6px;color:var(--p);font-weight:600;font-size:.85rem;text-decoration:none;margin-bottom:16px}
+.back-link{display:inline-flex;align-items:center;gap:6px;color:var(--p);font-weight:600;font-size:.85rem;text-decoration:none}
 .back-link:hover{text-decoration:underline}
-.updated{text-align:right;font-size:.75rem;color:var(--sub);margin-bottom:16px}
+.updated{font-size:.75rem;color:var(--sub)}
+/* DASHBOARD HEADER ROW */
+.dash-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+/* SYNC BUTTON */
+.sync-btn{display:inline-flex;align-items:center;gap:8px;padding:10px 22px;background:linear-gradient(135deg,#FF6D00,#FF9100);color:#fff;border:none;border-radius:12px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 3px 12px rgba(255,109,0,.35);transition:all .25s;animation:syncPulse 3s ease-in-out infinite}
+.sync-btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(255,109,0,.45);background:linear-gradient(135deg,#E65100,#FF6D00)}
+.sync-btn:active{transform:translateY(0)}
+.sync-btn:disabled{opacity:.6;cursor:not-allowed;animation:none;transform:none}
+.sync-btn .sync-icon{display:inline-block;font-size:1.1rem;transition:transform .3s}
+.sync-btn.syncing .sync-icon{animation:spinSync 1s linear infinite}
+@keyframes spinSync{to{transform:rotate(360deg)}}
+@keyframes syncPulse{0%,100%{box-shadow:0 3px 12px rgba(255,109,0,.35)}50%{box-shadow:0 5px 18px rgba(255,109,0,.55)}}
 /* STAT CARDS */
 .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px}
 .stat-card{background:var(--card);border-radius:14px;padding:16px;box-shadow:var(--sh);text-align:center}
@@ -94,7 +109,10 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:var(--bg);color:var(--te
     <div class="login-box">
       <h2>🔒 Xác thực giáo viên</h2>
       <p>Vui lòng nhập mật khẩu để truy cập</p>
-      <input type="password" id="pw-input" placeholder="Nhập mật khẩu..." onkeydown="if(event.key==='Enter')doLogin()">
+      <div class="pw-wrap">
+        <input type="password" id="pw-input" placeholder="Nhập mật khẩu..." onkeydown="if(event.key==='Enter')doLogin()">
+        <button type="button" class="pw-toggle" id="pw-toggle" onclick="togglePw()" title="Hiển thị mật khẩu">👁</button>
+      </div>
       <button onclick="doLogin()">Đăng nhập</button>
       <div class="login-err" id="login-err">❌ Mật khẩu không đúng!</div>
     </div>
@@ -102,8 +120,13 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:var(--bg);color:var(--te
 
   <!-- DASHBOARD -->
   <div id="dashboard">
-    <a href="index.html" class="back-link">← Quay lại trang tải hồ sơ</a>
-    <div class="updated" id="updated-at"></div>
+    <div class="dash-header">
+      <a href="index.html" class="back-link">← Quay lại trang tải hồ sơ</a>
+      <button class="sync-btn" id="sync-btn" onclick="syncData()">
+        <span class="sync-icon">🔄</span> Đồng bộ dữ liệu mới nhất
+      </button>
+      <div class="updated" id="updated-at"></div>
+    </div>
 
     <!-- TABS -->
     <div class="tabs" id="tabs">
@@ -165,7 +188,36 @@ function doLogin(){
   }
 }
 
-function loadData(){
+function togglePw(){
+  var inp=document.getElementById('pw-input');
+  var btn=document.getElementById('pw-toggle');
+  if(inp.type==='password'){
+    inp.type='text'; btn.textContent='🔒'; btn.title='Ẩn mật khẩu';
+  } else {
+    inp.type='password'; btn.textContent='👁'; btn.title='Hiển thị mật khẩu';
+  }
+}
+
+function syncData(){
+  var btn=document.getElementById('sync-btn');
+  if(btn.disabled) return;
+  btn.disabled=true; btn.classList.add('syncing');
+  btn.querySelector('.sync-icon').textContent='⏳';
+  var origText=btn.childNodes[1];
+  var txt=' Đang đồng bộ...';
+  btn.lastChild.textContent=txt;
+  loadData(function(){
+    btn.disabled=false; btn.classList.remove('syncing');
+    btn.querySelector('.sync-icon').textContent='✅';
+    btn.lastChild.textContent=' Đã cập nhật!';
+    setTimeout(function(){
+      btn.querySelector('.sync-icon').textContent='🔄';
+      btn.lastChild.textContent=' Đồng bộ dữ liệu mới nhất';
+    },2500);
+  });
+}
+
+function loadData(onDone){
   document.getElementById('dash-loading').style.display='block';
   Promise.all([
     fetch(TSDC_API+'?action=stats',{redirect:'follow'}).then(function(r){return r.json()}),
@@ -178,8 +230,10 @@ function loadData(){
     document.getElementById('updated-at').textContent='Cập nhật: '+(STATS.updated_at||res[1].updated_at||'—');
     renderOverview();renderAspirations();renderStudents();
     showTab('overview');
+    if(typeof onDone==='function') onDone();
   }).catch(function(e){
     document.getElementById('dash-loading').innerHTML='<div style="color:#c62828">❌ Lỗi tải dữ liệu: '+e.message+'</div>';
+    if(typeof onDone==='function') onDone();
   });
 }
 
