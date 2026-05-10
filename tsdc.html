@@ -114,7 +114,7 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:var(--bg);color:var(--te
     <div id="panel-overview" class="panel">
       <div class="stat-row" id="stat-cards"></div>
       <div class="card"><h3>📈 Trạng thái hồ sơ</h3><table class="nv-tbl" id="status-tbl"><thead><tr><th>Trạng thái</th><th style="width:80px">Số lượng</th><th style="width:40%">Tỷ lệ</th></tr></thead><tbody></tbody></table></div>
-      <div class="card"><h3>📋 Thống kê chi tiết theo lớp</h3><div class="tbl-wrap"><table class="stu-tbl" id="detail-stats-tbl"><thead><tr><th class="stt">STT</th><th>Lớp</th><th>TS HS<br>Lớp 9</th><th>Đăng ký TS<br>vào lớp 10</th><th>Chưa<br>đăng ký</th><th>Chờ xét<br>duyệt</th><th>Đã xét<br>duyệt</th></tr></thead><tbody id="detail-stats-tbody"></tbody></table></div></div>
+      <div class="card"><h3>📋 Thống kê chi tiết theo lớp</h3><div class="tbl-wrap"><table class="stu-tbl" id="detail-stats-tbl"><thead id="detail-stats-thead"></thead><tbody id="detail-stats-tbody"></tbody></table></div></div>
     </div>
 
     <!-- ASPIRATIONS -->
@@ -198,6 +198,28 @@ function showTab(id){
 
 function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML}
 
+// Helper: classify status key
+function classifyStatus(k){
+  var kl=k.toLowerCase();
+  if(kl.indexOf('chờ')>=0) return 'waiting';
+  if(kl.indexOf('xét duyệt')>=0||kl.indexOf('tiếp nhận')>=0||kl.indexOf('đã duyệt')>=0) return 'accepted';
+  return 'other';
+}
+
+// Helper: extract school name from NV1 (first line only)
+function getSchoolKey(nv1){
+  if(!nv1||nv1==='—'||nv1==='-'||nv1.trim()==='') return '';
+  var firstLine=nv1.split('\n')[0].trim();
+  // Group all chuyên schools into one key
+  if(firstLine.toLowerCase().indexOf('chuyên')>=0) return '__CHUYEN__||'+firstLine;
+  return firstLine;
+}
+function getSchoolLabel(key){
+  if(key.indexOf('__CHUYEN__||')===0) return key.replace('__CHUYEN__||','');
+  return key;
+}
+function isChuyenKey(key){ return key.indexOf('__CHUYEN__||')===0; }
+
 // ===== OVERVIEW =====
 function renderOverview(){
   if(!STATS) return;
@@ -205,13 +227,14 @@ function renderOverview(){
   var st=STATS.status||{};
   var accepted=0,waiting=0,other=0;
   Object.keys(st).forEach(function(k){
-    if(k.indexOf('xét duyệt')>=0||k.indexOf('tiếp nhận')>=0) accepted+=st[k];
-    else if(k.indexOf('Chờ')>=0) waiting+=st[k];
+    var cls=classifyStatus(k);
+    if(cls==='accepted') accepted+=st[k];
+    else if(cls==='waiting') waiting+=st[k];
     else other+=st[k];
   });
   document.getElementById('stat-cards').innerHTML=
     '<div class="stat-card"><div class="num">'+total+'</div><div class="lbl">Tổng hồ sơ</div></div>'+
-    '<div class="stat-card ok"><div class="num">'+accepted+'</div><div class="lbl">Đã xét duyệt</div></div>'+
+    '<div class="stat-card ok"><div class="num">'+accepted+'</div><div class="lbl">Đã tiếp nhận</div></div>'+
     '<div class="stat-card warn"><div class="num">'+waiting+'</div><div class="lbl">Chờ xử lý</div></div>'+
     '<div class="stat-card err"><div class="num">'+other+'</div><div class="lbl">Khác</div></div>';
   var tbody=document.querySelector('#status-tbl tbody');tbody.innerHTML='';
@@ -224,8 +247,58 @@ function renderOverview(){
 function renderDetailStats(){
   if(!STATS||!STATS.byClass) return;
   var classes=Object.keys(STATS.byClass).sort();
+
+  // Step 1: Collect unique NV1 schools from ALL_STUDENTS, group chuyên
+  var schoolKeysMap={}, chuyenLabel='';
+  ALL_STUDENTS.forEach(function(s){
+    var key=getSchoolKey(s.nv1);
+    if(!key) return;
+    if(isChuyenKey(key)){
+      if(!chuyenLabel) chuyenLabel=getSchoolLabel(key);
+      schoolKeysMap['__CHUYEN__']=1;
+    } else {
+      schoolKeysMap[key]=1;
+    }
+  });
+  // Build ordered school list: chuyên first, then alphabetical
+  var schoolCols=[];
+  if(schoolKeysMap['__CHUYEN__']) schoolCols.push({key:'__CHUYEN__',label:chuyenLabel||'Trường chuyên'});
+  Object.keys(schoolKeysMap).sort().forEach(function(k){
+    if(k!=='__CHUYEN__') schoolCols.push({key:k,label:k});
+  });
+  // Short display name for columns
+  function shortName(label){
+    return label.replace(/^Trường\s*/i,'').replace('THPT ','').replace('PTDTNT ','PTDTNT ');
+  }
+
+  // Step 2: Count per class per school (from ALL_STUDENTS)
+  var classCounts={}; // classCounts[lop][schoolKey] = count
+  ALL_STUDENTS.forEach(function(s){
+    var lop=s.lop||''; var key=getSchoolKey(s.nv1);
+    if(!lop||!key) return;
+    if(!classCounts[lop]) classCounts[lop]={};
+    var realKey=isChuyenKey(key)?'__CHUYEN__':key;
+    classCounts[lop][realKey]=(classCounts[lop][realKey]||0)+1;
+  });
+
+  // Step 3: Build table header (2 rows with colspan)
+  var thead=document.getElementById('detail-stats-thead');
+  var hdrRow1='<tr><th class="stt" rowspan="2">STT</th><th rowspan="2">Lớp</th><th rowspan="2">TS HS<br>Lớp 9</th>';
+  hdrRow1+='<th colspan="'+(schoolCols.length+1)+'" style="text-align:center;background:linear-gradient(135deg,#0D47A1,#1565C0)">Đăng ký TS vào lớp 10</th>';
+  hdrRow1+='<th rowspan="2">Chưa<br>đăng ký</th><th rowspan="2">Chờ tiếp<br>nhận</th><th rowspan="2">Đã tiếp<br>nhận</th></tr>';
+  var hdrRow2='<tr><th style="text-align:center">TS</th>';
+  var schoolColors=['#E65100','#1B5E20','#4A148C','#01579B','#BF360C','#311B92'];
+  schoolCols.forEach(function(sc,idx){
+    var color=schoolColors[idx%schoolColors.length];
+    hdrRow2+='<th style="text-align:center;min-width:80px;color:'+color+'">'+esc(shortName(sc.label))+'</th>';
+  });
+  hdrRow2+='</tr>';
+  thead.innerHTML=hdrRow1+hdrRow2;
+
+  // Step 4: Build table body
   var tbody=document.getElementById('detail-stats-tbody');tbody.innerHTML='';
   var sumTS=0,sumDK=0,sumChua=0,sumCho=0,sumDuyet=0;
+  var sumSchool={}; schoolCols.forEach(function(sc){sumSchool[sc.key]=0;});
   classes.forEach(function(lop,i){
     var c=STATS.byClass[lop];
     var tsLop9=CLASS_SIZES[lop]||c.total;
@@ -233,15 +306,34 @@ function renderDetailStats(){
     var chua=Math.max(tsLop9-dk,0);
     var cho=0,duyet=0;
     Object.keys(c.status||{}).forEach(function(k){
-      if(k.indexOf('xét duyệt')>=0||k.indexOf('tiếp nhận')>=0) duyet+=c.status[k];
-      else if(k.indexOf('Chờ')>=0) cho+=c.status[k];
+      var cls=classifyStatus(k);
+      if(cls==='accepted') duyet+=c.status[k];
       else cho+=c.status[k];
     });
     sumTS+=tsLop9;sumDK+=dk;sumChua+=chua;sumCho+=cho;sumDuyet+=duyet;
     var chuaStyle=chua>0?'color:#c62828;font-weight:700':'';
-    tbody.innerHTML+='<tr><td class="stt">'+(i+1)+'</td><td><strong>'+esc(lop)+'</strong></td><td>'+tsLop9+'</td><td style="color:#1565C0;font-weight:700">'+dk+'</td><td style="'+chuaStyle+'">'+chua+'</td><td>'+cho+'</td><td style="color:#2e7d32;font-weight:700">'+duyet+'</td></tr>';
+    var row='<tr><td class="stt">'+(i+1)+'</td><td><strong>'+esc(lop)+'</strong></td><td>'+tsLop9+'</td>';
+    row+='<td style="color:#1565C0;font-weight:700;text-align:center">'+dk+'</td>';
+    // Per-school counts
+    var cc=classCounts[lop]||{};
+    schoolCols.forEach(function(sc,idx){
+      var cnt=cc[sc.key]||0;
+      sumSchool[sc.key]+=cnt;
+      var color=schoolColors[idx%schoolColors.length];
+      row+='<td style="text-align:center;'+(cnt>0?'color:'+color+';font-weight:700':'color:#ccc')+'">'+(cnt||'–')+'</td>';
+    });
+    row+='<td style="'+chuaStyle+'">'+chua+'</td><td>'+cho+'</td><td style="color:#2e7d32;font-weight:700">'+duyet+'</td></tr>';
+    tbody.innerHTML+=row;
   });
-  tbody.innerHTML+='<tr style="background:#f0f4f8;font-weight:800"><td></td><td>Tổng</td><td>'+sumTS+'</td><td style="color:#1565C0">'+sumDK+'</td><td style="color:#c62828">'+sumChua+'</td><td>'+sumCho+'</td><td style="color:#2e7d32">'+sumDuyet+'</td></tr>';
+  // Total row
+  var totalRow='<tr style="background:#f0f4f8;font-weight:800"><td></td><td>Tổng</td><td>'+sumTS+'</td>';
+  totalRow+='<td style="color:#1565C0;text-align:center">'+sumDK+'</td>';
+  schoolCols.forEach(function(sc,idx){
+    var color=schoolColors[idx%schoolColors.length];
+    totalRow+='<td style="text-align:center;color:'+color+'">'+sumSchool[sc.key]+'</td>';
+  });
+  totalRow+='<td style="color:#c62828">'+sumChua+'</td><td>'+sumCho+'</td><td style="color:#2e7d32">'+sumDuyet+'</td></tr>';
+  tbody.innerHTML+=totalRow;
 }
 
 // ===== ASPIRATIONS =====
@@ -271,11 +363,11 @@ function renderClasses(){
     var c=STATS.byClass[lop];
     var card=document.createElement('div');card.className='cls-card';
     card.onclick=function(){showClassDetail(lop)};
-    var accepted=0;Object.keys(c.status||{}).forEach(function(k){if(k.indexOf('xét duyệt')>=0||k.indexOf('tiếp nhận')>=0)accepted+=c.status[k]});
+    var accepted=0;Object.keys(c.status||{}).forEach(function(k){if(classifyStatus(k)==='accepted')accepted+=c.status[k]});
     var pct=c.total?Math.round(accepted/c.total*100):0;
     card.innerHTML='<div class="cn">🏫 Lớp '+esc(lop)+'</div><div class="ct">'+c.total+' học sinh đăng ký</div>'+
       '<div class="bar"><span style="width:'+pct+'%;background:#2e7d32"></span><span style="width:'+(100-pct)+'%;background:#e3e8ef"></span></div>'+
-      '<div class="ct" style="margin-top:4px">Xét duyệt: '+pct+'%</div>';
+      '<div class="ct" style="margin-top:4px">Đã tiếp nhận: '+pct+'%</div>';
     grid.appendChild(card);
   });
 }
@@ -343,8 +435,9 @@ function filterStu(){
   var tbody=document.getElementById('stu-tbody');tbody.innerHTML='';
   filtered.forEach(function(s,i){
     var badge='badge-other',st=s.trangThai||'';
-    if(st.indexOf('xét duyệt')>=0||st.indexOf('tiếp nhận')>=0) badge='badge-ok';
-    else if(st.indexOf('Chờ')>=0) badge='badge-wait';
+    var stCls=classifyStatus(st);
+    if(stCls==='accepted') badge='badge-ok';
+    else if(stCls==='waiting') badge='badge-wait';
     var nvCount=countNV(s);
     var noteTd='';
     if(nvCount===1){
